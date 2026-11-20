@@ -59,8 +59,12 @@ function parseCSV(t) {
 }
 function el(tag, attrs, text) { const e = document.createElement(tag); Object.assign(e, attrs || {}); if (text != null) e.textContent = text; return e; }
 function fmtDate(s) { const d = new Date(s + 'T00:00:00'); return isNaN(d) ? s : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); }
+// IDs are compared on letters and digits only, so an ID copied from the PDF (whose hyphens can paste
+// as other characters), typed with spaces or en dashes, or in lower case still matches.
+const key = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+function pretty(s) { const m = key(s).match(/^MMLAMR(SIM|HW)(\d{4})(\d{4})$/); return m ? `MML-AMR-${m[1]}-${m[2]}-${m[3]}` : String(s).trim().toUpperCase(); }
 async function verify(id) {
-  id = id.trim().toUpperCase(); if (!id) return;
+  id = pretty(id); if (!id) return; input.value = id;
   history.replaceState(null, '', '?id=' + encodeURIComponent(id));
   out.innerHTML = ''; out.append(el('p', { className: 'lead' }, 'Checking ' + id + '…'));
   let hit;
@@ -69,7 +73,7 @@ async function verify(id) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const rows = parseCSV(await r.text()), head = (rows.shift() || []).map(h => h.trim());
     if (!head.includes('certificate_id') || !head.includes('status')) throw new Error('Unexpected registry format');
-    hit = rows.map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()]))).find(r => (r.certificate_id || '').toUpperCase() === id);
+    hit = rows.map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()]))).find(r => key(r.certificate_id) === key(id));
   } catch (e) { out.innerHTML = ''; out.append(el('p', { className: 'lead' }, 'The registry could not be loaded. Please try again in a minute.')); return; }
   out.innerHTML = '';
   const card = el('div', { className: 'card' });
