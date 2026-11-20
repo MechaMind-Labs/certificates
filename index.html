@@ -63,10 +63,14 @@ async function verify(id) {
   id = id.trim().toUpperCase(); if (!id) return;
   history.replaceState(null, '', '?id=' + encodeURIComponent(id));
   out.innerHTML = ''; out.append(el('p', { className: 'lead' }, 'Checking ' + id + '…'));
-  let rows;
-  try { const r = await fetch(REGISTRY_CSV + (REGISTRY_CSV.includes('?') ? '&' : '?') + 't=' + Date.now()); rows = parseCSV(await r.text()); }
-  catch (e) { out.innerHTML = ''; out.append(el('p', { className: 'lead' }, 'The registry could not be loaded. Please try again in a minute.')); return; }
-  const head = rows.shift().map(h => h.trim()), hit = rows.map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()]))).find(r => r.certificate_id.toUpperCase() === id);
+  let hit;
+  try {
+    const r = await fetch(REGISTRY_CSV + (REGISTRY_CSV.includes('?') ? '&' : '?') + 't=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const rows = parseCSV(await r.text()), head = (rows.shift() || []).map(h => h.trim());
+    if (!head.includes('certificate_id') || !head.includes('status')) throw new Error('Unexpected registry format');
+    hit = rows.map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || '').trim()]))).find(r => (r.certificate_id || '').toUpperCase() === id);
+  } catch (e) { out.innerHTML = ''; out.append(el('p', { className: 'lead' }, 'The registry could not be loaded. Please try again in a minute.')); return; }
   out.innerHTML = '';
   const card = el('div', { className: 'card' });
   if (!hit) {
